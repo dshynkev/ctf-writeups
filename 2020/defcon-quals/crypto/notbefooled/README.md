@@ -146,9 +146,9 @@ my mathematical background was insufficient to exploit this.
 There is a fairly detailed explanation [[4]](#References) of how to generate general anomalous curves,
 but it is not clear which additional constraints are needed to ensure that the trivial lift is canonical.
 
-In the end, I consulted an authority in the field, who pointed me to the fact that a zero `j`-invariant
-(like in [[2]](#References)) together with a more careful choice of `p` (`27 * m**2 + 1`) is sufficient.
-Note that this is essentially the `D = 3` case from [4], which is disregarded there
+In the end, I consulted an [authority in the field](https://www.math.uwaterloo.ca/~ajmeneze),
+who pointed me to the fact that a zero `j`-invariant (like in the curve in [[2]](#References)) is sufficient.
+With this in mind, we can simply implement the `D = 3` case from [4], which is disregarded in the paper
 as an edge case (formulae differ when `j = 0`).
 
 ## Solution
